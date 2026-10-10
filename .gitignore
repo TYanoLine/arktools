@@ -13,3 +13,10 @@ desktop.ini
 *.tmp
 *.bak
 *.swp
+
+# Local deployment & environment configurations
+deploy/
+deploy.config*
+*.local
+.env
+.env.*
