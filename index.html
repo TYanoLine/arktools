@@ -1,0 +1,1903 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>ARK: ASA 座標変換ツール</title>
+    <style>
+        :root {
+            --bg-color: #0c161c;
+            --panel-bg: #10252e;
+            --card-bg: #173642; /* 画像の塗りの平均色 (RGB: 23, 54, 66) */
+            --text-color: #f0f8fa;
+            --text-muted: #8ca7b0;
+            --accent-color: #8fe0eb; /* 画像の文字・ふちの色 (RGB: 143, 224, 235) */
+            --accent-hover: #abf0fd;
+            --marker-color: #ff2a5f;
+            --border-color: #264e5c;
+            --input-bg: #122b35;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 16px;
+            min-height: 100vh;
+            min-height: 100dvh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            background-color: var(--panel-bg);
+            padding: 28px;
+            border-radius: 18px;
+            box-shadow: 0 14px 40px rgba(0, 0, 0, 0.7);
+            max-width: 1040px;
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1.15fr 0.85fr;
+            gap: 30px;
+        }
+
+        /* iPad mini (縦) 〜 タブレット向けレイアウト */
+        @media (max-width: 900px) {
+            body {
+                padding: 14px;
+                align-items: flex-start;
+            }
+            .container {
+                grid-template-columns: 1fr;
+                max-width: 680px;
+                padding: 22px 20px;
+                gap: 22px;
+                border-radius: 14px;
+            }
+
+            /* タッチデバイスでは一括貼付・ボタンエリアを非表示 */
+            .paste-box,
+            .action-buttons {
+                display: none !important;
+            }
+
+            .map-wrapper {
+                max-width: 460px !important;
+            }
+
+            .coord-card {
+                padding: 15px 12px;
+            }
+            .coord-title {
+                font-size: 0.95rem;
+                color: var(--accent-color);
+            }
+            .coord-value {
+                font-size: 2.8rem !important;
+            }
+        }
+
+        /* スマートフォン向け最適化 */
+        @media (max-width: 480px) {
+            body {
+                padding: 8px;
+            }
+            .container {
+                padding: 15px 12px;
+                gap: 16px;
+            }
+            .coord-row {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+            .btn-toggle-sign, .btn-keypad-trigger {
+                min-width: 48px;
+                min-height: 50px;
+            }
+            .map-wrapper {
+                max-width: 340px !important;
+            }
+            .coord-value {
+                font-size: 2.3rem !important;
+            }
+        }
+
+        .input-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        header h1 {
+            font-size: 1.45rem;
+            margin: 0 0 4px 0;
+            color: var(--accent-color);
+            letter-spacing: 0.5px;
+        }
+
+        header p {
+            margin: 0 0 8px 0;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .cmd-link {
+            color: var(--accent-color);
+            text-decoration: underline;
+            text-underline-offset: 3px;
+            font-weight: 600;
+            transition: color 0.15s ease, opacity 0.15s ease;
+        }
+
+        .cmd-link:hover {
+            color: var(--accent-hover);
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        label {
+            font-size: 0.92rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        /* 入力欄を大きめ・タップしやすく調整 (iPad mini / スマホ対応) */
+        select, input[type="text"], input[type="number"] {
+            background-color: var(--input-bg);
+            border: 1px solid var(--border-color);
+            color: #fff;
+            padding: 13px 16px;
+            border-radius: 10px;
+            font-size: 18px;
+            min-height: 52px;
+            font-weight: 500;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            width: 100%;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        select {
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238fe0eb' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+            background-size: 18px;
+            padding-right: 44px;
+            cursor: pointer;
+        }
+
+        select:focus, input:focus {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px rgba(143, 224, 235, 0.28);
+        }
+
+        .coord-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+
+        .paste-box {
+            background-color: rgba(23, 54, 66, 0.4);
+            border: 1px dashed rgba(143, 224, 235, 0.4);
+            border-radius: 10px;
+            padding: 10px 14px;
+        }
+
+        .paste-box label {
+            color: var(--accent-color);
+            font-size: 0.82rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .paste-box input {
+            margin-top: 6px;
+            background-color: #0e232c;
+            font-size: 15px;
+            padding: 10px 12px;
+            min-height: 44px;
+        }
+
+        /* 結果ボックス & 数字の大型表示 */
+        .result-box {
+            background-color: var(--card-bg);
+            padding: 16px 18px;
+            border-radius: 12px;
+            border: 1px solid rgba(143, 224, 235, 0.35);
+            border-left: 4px solid var(--accent-color);
+            position: relative;
+        }
+
+        .coords-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+
+        .coord-card {
+            background-color: #112833;
+            border: 1px solid rgba(143, 224, 235, 0.28);
+            border-radius: 10px;
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .coord-title {
+            font-size: 0.92rem;
+            font-weight: 700;
+            color: var(--accent-color);
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .coord-value {
+            font-size: 2.6rem;
+            font-weight: 800;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
+            line-height: 1.1;
+            letter-spacing: -0.5px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: background-color 0.2s, transform 0.1s;
+            min-height: 48px;
+            flex: 1;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn-copy {
+            background-color: var(--accent-color);
+            color: #0d1117;
+        }
+
+        .btn-copy:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .toast {
+            font-size: 0.78rem;
+            color: var(--accent-color);
+            text-align: right;
+            min-height: 1.1em;
+            margin-top: 4px;
+        }
+
+        /* 右側マップパネル */
+        .map-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .map-wrapper {
+            width: 100%;
+            max-width: 440px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .map-visual {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            background-color: #0b0e12;
+            background-size: 100% 100%;
+            background-position: center;
+            background-repeat: no-repeat;
+            border: 2px solid var(--border-color);
+            position: relative;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+            transition: background-image 0.25s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+            cursor: default;
+            user-select: none;
+            touch-action: pan-x pan-y;
+        }
+
+        /* タッチ入力ON時のみ touch-action: none とクロスヘアカーソル */
+        .map-visual.touch-enabled {
+            touch-action: none !important;
+            cursor: crosshair !important;
+            border-color: var(--accent-color) !important;
+            box-shadow: 0 0 16px rgba(143, 224, 235, 0.4) !important;
+        }
+
+        /* 10x10のグリッド線 (10%刻み) */
+        .map-visual::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: 
+                linear-gradient(to right, rgba(255, 255, 255, 0.18) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.18) 1px, transparent 1px);
+            background-size: 10% 10%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* 50,50の中央十字ハイライト線 */
+        .map-visual::after {
+            content: '';
+            position: absolute;
+            top: 50%; left: 0; right: 0;
+            height: 1px;
+            background-color: rgba(143, 224, 235, 0.45);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .map-label {
+            position: absolute;
+            font-size: 0.68rem;
+            color: #e6edf3;
+            font-family: monospace;
+            background-color: rgba(13, 17, 23, 0.85);
+            padding: 2px 5px;
+            border-radius: 4px;
+            pointer-events: none;
+            z-index: 2;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .label-top-left { top: 6px; left: 6px; }
+        .label-bottom-right { bottom: 6px; right: 6px; }
+
+        /* 地図操作トグルスイッチボタン */
+        .btn-map-toggle {
+            width: 100%;
+            margin-top: 10px;
+            padding: 10px 14px;
+            background-color: #102732;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-muted);
+            font-size: 0.88rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        .btn-map-toggle:hover {
+            border-color: rgba(255, 255, 255, 0.25);
+            background-color: #212832;
+        }
+
+        .map-toggle-left {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        .map-toggle-icon {
+            font-size: 1.1rem;
+        }
+
+        .map-toggle-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .toggle-switch-pill {
+            width: 44px;
+            height: 24px;
+            background-color: #30363d;
+            border-radius: 12px;
+            position: relative;
+            transition: background-color 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .toggle-switch-pill::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background-color: #8b949e;
+            transition: transform 0.2s ease, background-color 0.2s ease;
+        }
+
+        .toggle-status-text {
+            font-size: 0.82rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            min-width: 30px;
+            text-align: right;
+            color: var(--text-muted);
+        }
+
+        /* ON (アクティブ) 状態 */
+        .btn-map-toggle.active {
+            background-color: rgba(143, 224, 235, 0.15);
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+            box-shadow: 0 0 12px rgba(143, 224, 235, 0.25);
+        }
+
+        .btn-map-toggle.active .toggle-switch-pill {
+            background-color: var(--accent-color);
+        }
+
+        .btn-map-toggle.active .toggle-switch-pill::after {
+            transform: translateX(20px);
+            background-color: #0c161c;
+        }
+
+        .btn-map-toggle.active .toggle-status-text {
+            color: var(--accent-color);
+        }
+
+        .marker {
+            width: 14px;
+            height: 14px;
+            background-color: var(--marker-color);
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            position: absolute;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 12px var(--marker-color);
+            transition: top 0.08s ease-out, left 0.08s ease-out;
+            display: none;
+            z-index: 3;
+            pointer-events: none;
+        }
+
+        .marker-pulse {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 42, 95, 0.55);
+            border-radius: 50%;
+            animation: pulse 1.5s infinite ease-out;
+            top: 0;
+            left: 0;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(3.2); opacity: 0; }
+        }
+
+        /* テキストボックス内包テンキーアイコン */
+        .input-inline-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+            width: 100%;
+        }
+
+        .input-inline-wrap input {
+            width: 100%;
+            padding-right: 50px; /* 内部アイコン用の余白 */
+        }
+
+        .btn-inline-keypad {
+            position: absolute;
+            right: 6px;
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            background: transparent;
+            border: none;
+            color: var(--accent-color);
+            font-size: 21px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+            user-select: none;
+            z-index: 2;
+        }
+
+        .btn-inline-keypad:hover {
+            background-color: rgba(143, 224, 235, 0.18);
+            transform: scale(1.06);
+        }
+
+        .btn-inline-keypad.active {
+            background-color: var(--accent-color);
+            color: #0c161c;
+            box-shadow: 0 0 10px rgba(143, 224, 235, 0.5);
+        }
+
+        .btn-inline-keypad:active {
+            transform: scale(0.92);
+        }
+
+        .input-inline-wrap.keypad-active-field input {
+            border-color: var(--accent-color) !important;
+            box-shadow: 0 0 0 3px rgba(143, 224, 235, 0.35) !important;
+        }
+
+        .coord-section-wrap {
+            position: relative;
+            width: 100%;
+        }
+
+        .virtual-keypad {
+            position: absolute;
+            top: calc(100% + 12px);
+            left: 0;
+            right: 0;
+            z-index: 60;
+            background-color: #173642; /* 画像の塗りの平均色 */
+            border: 1.5px solid #8fe0eb; /* 文字の色とふちの色を合わせる */
+            border-radius: 12px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.75), 0 0 16px rgba(143, 224, 235, 0.25);
+            animation: popoverIn 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            transform-origin: top var(--beak-pos, 25%);
+        }
+
+        /* 吹き出しの三角（Beak / Pointer arrow） */
+        .virtual-keypad::before,
+        .virtual-keypad::after {
+            content: '';
+            position: absolute;
+            bottom: 100%;
+            left: var(--beak-pos, 25%);
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-style: solid;
+            pointer-events: none;
+            transition: left 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .virtual-keypad::before {
+            border-width: 0 9px 9px 9px;
+            border-color: transparent transparent #8fe0eb transparent;
+            z-index: 61;
+        }
+
+        .virtual-keypad::after {
+            border-width: 0 8px 8px 8px;
+            border-color: transparent transparent #173642 transparent;
+            z-index: 62;
+            margin-bottom: -1.5px;
+        }
+
+        @keyframes popoverIn {
+            0% {
+                opacity: 0;
+                transform: translateY(-8px) scale(0.97);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .keypad-target-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(143, 224, 235, 0.25);
+            flex-wrap: wrap;
+        }
+
+        .keypad-status-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.86rem;
+            font-weight: 700;
+            color: #8fe0eb;
+            white-space: nowrap;
+        }
+
+        .keypad-status-dot {
+            font-size: 0.7rem;
+            color: #8fe0eb;
+            animation: blinkDot 1.5s infinite;
+        }
+
+        @keyframes blinkDot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .keypad-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-switch-target {
+            background-color: rgba(143, 224, 235, 0.15);
+            border: 1px solid #8fe0eb;
+            color: #8fe0eb;
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .btn-switch-target:hover {
+            background-color: rgba(143, 224, 235, 0.28);
+        }
+
+        .btn-keypad-close {
+            background: none;
+            border: none;
+            color: #8ca7b0;
+            font-size: 0.82rem;
+            cursor: pointer;
+            padding: 5px 8px;
+            border-radius: 6px;
+        }
+
+        .btn-keypad-close:hover {
+            color: #8fe0eb;
+            background-color: rgba(143, 224, 235, 0.12);
+        }
+
+        .keypad-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+
+        .key-btn {
+            min-height: 48px;
+            background-color: #112833;
+            border: 1px solid rgba(143, 224, 235, 0.35);
+            border-radius: 8px;
+            color: #8fe0eb; /* 文字の色とふちの色を合わせる */
+            font-size: 1.3rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.1s, transform 0.08s, border-color 0.1s;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        .key-btn:hover {
+            border-color: #8fe0eb;
+            background-color: rgba(143, 224, 235, 0.15);
+        }
+
+        .key-btn:active {
+            transform: scale(0.95);
+            background-color: rgba(143, 224, 235, 0.3);
+        }
+
+        .key-action {
+            background-color: #2b1f24;
+            color: #ff6b8b;
+            border-color: rgba(255, 42, 95, 0.35);
+            font-size: 1.05rem;
+        }
+
+        .key-symbol {
+            background-color: rgba(143, 224, 235, 0.12);
+            color: #8fe0eb;
+            border-color: #8fe0eb;
+        }
+
+        .key-next {
+            background-color: #8fe0eb;
+            color: #0c161c;
+            border-color: #8fe0eb;
+            font-size: 0.92rem;
+            font-weight: 700;
+        }
+
+        .input-with-action.keypad-active-field input {
+            border-color: var(--accent-color) !important;
+            box-shadow: 0 0 0 3px rgba(143, 224, 235, 0.35) !important;
+        }
+
+        /* お気に入りセクション（折りたたみ対応・コンパクト化） */
+        .favorite-section {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            border-left: 4px solid #ffd166;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+
+        .fav-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            cursor: pointer;
+            user-select: none;
+            background-color: transparent;
+            transition: background-color 0.15s;
+        }
+
+        .fav-header:hover {
+            background-color: rgba(255, 209, 102, 0.08);
+        }
+
+        .fav-title-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .fav-title {
+            font-weight: 700;
+            font-size: 0.92rem;
+            color: #ffd166;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .fav-count {
+            font-size: 0.75rem;
+            background: rgba(255, 209, 102, 0.15);
+            color: #ffd166;
+            padding: 2px 7px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+        .fav-toggle-btn {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .fav-body {
+            padding: 0 16px 14px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            animation: fadeIn 0.15s ease-out;
+        }
+
+        .fav-action-bar {
+            display: flex;
+            gap: 8px;
+        }
+
+        .fav-action-bar input {
+            flex: 1;
+            min-height: 42px;
+            font-size: 14px;
+            padding: 8px 12px;
+            background-color: #0e232c;
+        }
+
+        .btn-fav {
+            padding: 8px 14px;
+            min-height: 42px;
+            font-size: 0.86rem;
+            font-weight: 600;
+            border-radius: 8px;
+            border: 1px solid #ffd166;
+            background-color: rgba(255, 209, 102, 0.12);
+            color: #ffd166;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            white-space: nowrap;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .btn-fav:hover {
+            background-color: rgba(255, 209, 102, 0.25);
+        }
+
+        .btn-fav.active {
+            background-color: #ffd166;
+            color: #0b0e12;
+            font-weight: 700;
+        }
+
+        .btn-fav:active {
+            transform: scale(0.98);
+        }
+
+        .fav-list {
+            max-height: 160px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding-right: 4px;
+        }
+
+        .fav-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: #112833;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 10px;
+            cursor: pointer;
+            transition: border-color 0.15s, background-color 0.15s;
+        }
+
+        .fav-item:hover {
+            border-color: #ffd166;
+            background-color: rgba(255, 209, 102, 0.06);
+        }
+
+        .fav-item-main {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .fav-item-name {
+            font-weight: 600;
+            font-size: 0.88rem;
+            color: #ffffff;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .fav-item-coords {
+            font-size: 0.76rem;
+            color: var(--accent-color);
+            font-family: monospace;
+        }
+
+        .fav-del-btn {
+            background: none;
+            border: none;
+            color: #8b949e;
+            padding: 4px 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: color 0.15s, background-color 0.15s;
+            flex-shrink: 0;
+        }
+
+        .fav-del-btn:hover {
+            color: #ff2a5f;
+            background-color: rgba(255, 42, 95, 0.12);
+        }
+
+        .fav-empty {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.82rem;
+            padding: 10px 0;
+        }
+
+        /* 地図上の保存ピン */
+        .fav-map-pin {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 2;
+            font-size: 16px;
+            color: #ffd166;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.85));
+            transition: transform 0.15s ease;
+            user-select: none;
+        }
+
+        .fav-map-pin:hover {
+            transform: translate(-50%, -50%) scale(1.4);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- 入力＆結果パネル -->
+    <div class="input-panel">
+        <header>
+            <h1>ARK: ASA 座標変換ツール</h1>
+            <p><a href="https://arkids.net/creatures" target="_blank" rel="noopener noreferrer" class="cmd-link" title="生物のクラス名・Entity ID 一覧 (arkids.net) を別タブで開く">GetAllLocation</a> / SetPlayerPos の座標をゲーム内 GPS 緯度・経度に変換</p>
+        </header>
+        
+        <div class="form-group">
+            <label for="mapSelect">プレイ中のマップ</label>
+            <select id="mapSelect">
+                <option value="the_island">The Island (アイランド)</option>
+                <option value="scorched_earth">Scorched Earth (スコーチド・アース)</option>
+                <option value="the_center">The Center (ザ・センター)</option>
+                <option value="aberration">Aberration (アベレーション)</option>
+                <option value="extinction">Extinction (エクスティンクション)</option>
+            </select>
+        </div>
+
+        <!-- コマンド結果貼り付け（スマホ版では非表示） -->
+        <div class="paste-box">
+            <label for="inputRaw">
+                <span>📋 コマンド結果を一括貼り付け</span>
+                <span style="font-weight: normal; opacity: 0.8; font-size: 0.72rem;">自動解析</span>
+            </label>
+            <input type="text" id="inputRaw" placeholder="例: X=178440 Y=71520 やログ行をそのまま貼付">
+        </div>
+
+        <div class="coord-section-wrap">
+            <div class="coord-row">
+                <div class="form-group">
+                    <label for="inputX">X 座標 (経度方向)</label>
+                    <div class="input-inline-wrap">
+                        <input type="text" inputmode="decimal" id="inputX" placeholder="例: 178440" autocomplete="off">
+                        <button type="button" class="btn-inline-keypad" id="btnKeypadTriggerX" title="専用テンキーを開く">🔢</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="inputY">Y 座標 (緯度方向)</label>
+                    <div class="input-inline-wrap">
+                        <input type="text" inputmode="decimal" id="inputY" placeholder="例: 71520" autocomplete="off">
+                        <button type="button" class="btn-inline-keypad" id="btnKeypadTriggerY" title="専用テンキーを開く">🔢</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 専用テンキーパッド（オーバーレイ / 吹き出しポップオーバー） -->
+            <div class="virtual-keypad" id="virtualKeypad" style="display: none;">
+                <div class="keypad-target-row">
+                    <div class="keypad-status-badge">
+                        <span class="keypad-status-dot">●</span>
+                        <span id="keypadCurrentTargetLabel">X 座標を入力中</span>
+                    </div>
+                    <div class="keypad-header-actions">
+                        <button type="button" class="btn-switch-target" id="btnSwitchTarget">Y 座標へ ➔</button>
+                        <button type="button" class="btn-keypad-close" id="btnCloseKeypad" title="閉じる">✕ 閉じる</button>
+                    </div>
+                </div>
+                <div class="keypad-grid">
+                    <button type="button" class="key-btn" data-key="7">7</button>
+                    <button type="button" class="key-btn" data-key="8">8</button>
+                    <button type="button" class="key-btn" data-key="9">9</button>
+                    <button type="button" class="key-btn key-action" data-key="backspace" title="1文字削除">⌫</button>
+
+                    <button type="button" class="key-btn" data-key="4">4</button>
+                    <button type="button" class="key-btn" data-key="5">5</button>
+                    <button type="button" class="key-btn" data-key="6">6</button>
+                    <button type="button" class="key-btn key-action" data-key="clear" title="全クリア">AC</button>
+
+                    <button type="button" class="key-btn" data-key="1">1</button>
+                    <button type="button" class="key-btn" data-key="2">2</button>
+                    <button type="button" class="key-btn" data-key="3">3</button>
+                    <button type="button" class="key-btn key-symbol" data-key="toggle-sign" title="正負反転">±</button>
+
+                    <button type="button" class="key-btn key-symbol" data-key="-" title="マイナス">−</button>
+                    <button type="button" class="key-btn" data-key="0">0</button>
+                    <button type="button" class="key-btn" data-key=".">.</button>
+                    <button type="button" class="key-btn key-next" id="btnKeyNext" title="次の入力欄へ">次へ ➔</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 結果表示: 緯度・経度をタイトルにして数字を大きく -->
+        <div class="result-box">
+            <div class="coords-grid">
+                <div class="coord-card">
+                    <div class="coord-title">緯度 (Lat)</div>
+                    <div class="coord-value" id="latResult">--.-</div>
+                </div>
+                <div class="coord-card">
+                    <div class="coord-title">経度 (Lon)</div>
+                    <div class="coord-value" id="lonResult">--.-</div>
+                </div>
+            </div>
+            <div class="action-buttons">
+                <button type="button" class="btn btn-copy" id="btnCopy">📋 座標をコピー</button>
+            </div>
+            <div class="toast" id="toastMessage"></div>
+        </div>
+
+        <!-- お気に入り管理セクション（折りたたみ可能） -->
+        <div class="favorite-section" id="favoriteSection">
+            <div class="fav-header" id="btnToggleFavSection" title="クリックで展開/折りたたみ">
+                <div class="fav-title-group">
+                    <span class="fav-title">⭐ お気に入り座標</span>
+                    <span class="fav-count" id="favCountBadge">0件</span>
+                </div>
+                <div class="fav-toggle-btn">
+                    <span id="favToggleArrow">▼ 展開</span>
+                </div>
+            </div>
+            
+            <div class="fav-body" id="favBody" style="display: none;">
+                <div class="fav-action-bar">
+                    <input type="text" id="favNameInput" placeholder="お気に入りの名前 (例: マイ拠点)" maxlength="24">
+                    <button type="button" class="btn-fav" id="btnFavToggle">
+                        <span id="favBtnIcon">⭐</span>
+                        <span id="favBtnText">お気に入り登録</span>
+                    </button>
+                </div>
+
+                <div class="fav-list" id="favList">
+                    <div class="fav-empty">このマップに登録されたお気に入りはありません</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 視覚図パネル -->
+    <div class="map-panel">
+        <div class="map-wrapper">
+            <div class="map-visual" id="mapVisual">
+                <div class="map-label label-top-left">0, 0 (北西)</div>
+                <div class="map-label label-bottom-right">100, 100 (南東)</div>
+                <div id="favMapPinsLayer"></div>
+                <div class="marker" id="mapMarker">
+                    <div class="marker-pulse"></div>
+                </div>
+            </div>
+            <button type="button" class="btn-map-toggle" id="btnMapTouchToggle" title="地図タッチでの座標入力を切り替え">
+                <div class="map-toggle-left">
+                    <span class="map-toggle-icon">👆</span>
+                    <span>地図タッチ/ドラッグ入力</span>
+                </div>
+                <div class="map-toggle-right">
+                    <span class="toggle-status-text" id="mapToggleStatusText">OFF</span>
+                    <div class="toggle-switch-pill"></div>
+                </div>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 公式Wiki座標変換仕様および地上検証値（Ground Truth）のマップ定義
+    const MAP_CONFIGS = {
+        the_island: {
+            name: "The Island",
+            shiftLat: 50.0,
+            shiftLon: 50.0,
+            multLat: 8000.0,
+            multLon: 8000.0,
+            image: "images/the_island.jpg",
+            landmarks: [
+                { name: "赤オベリスク (Red)", x: -260680, y: 238890, gt: "Lat 79.8 / Lon 17.4" },
+                { name: "緑オベリスク (Green)", x: 178440, y: 71520, gt: "Lat 58.9 / Lon 72.3" },
+                { name: "青オベリスク (Blue)", x: -195131, y: -196368, gt: "Lat 25.4 / Lon 25.6" },
+                { name: "TEK洞窟 (Tek Cave)", x: -87011, y: -54601, gt: "Lat 43.1 / Lon 39.1" }
+            ]
+        },
+        scorched_earth: {
+            name: "Scorched Earth",
+            shiftLat: 50.0,
+            shiftLon: 50.0,
+            multLat: 8000.0,
+            multLon: 8000.0,
+            image: "images/scorched_earth.jpg",
+            landmarks: [
+                { name: "赤オベリスク (Red)", x: -86400, y: 168000, gt: "Lat 71.0 / Lon 39.2" },
+                { name: "緑オベリスク (Green)", x: 194400, y: 0, gt: "Lat 50.0 / Lon 74.3" },
+                { name: "青オベリスク (Blue)", x: -128000, y: -261600, gt: "Lat 17.3 / Lon 34.0" }
+            ]
+        },
+        the_center: {
+            name: "The Center",
+            shiftLat: 30.34,
+            shiftLon: 55.10,
+            multLat: 9584.0,
+            multLon: 9600.0,
+            image: "images/the_center.jpg",
+            landmarks: [
+                { name: "赤オベリスク (Red)", x: 37440, y: -211231, gt: "Lat 8.3 / Lon 59.0" },
+                { name: "緑オベリスク (Green)", x: -377280, y: 42745, gt: "Lat 34.8 / Lon 15.8" },
+                { name: "青オベリスク (Blue)", x: 250560, y: 195130, gt: "Lat 50.7 / Lon 81.2" }
+            ]
+        },
+        aberration: {
+            name: "Aberration",
+            shiftLat: 50.0,
+            shiftLon: 50.0,
+            multLat: 8000.0,
+            multLon: 8000.0,
+            image: "images/aberration.jpg",
+            landmarks: [
+                { name: "赤オベリスク (Red)", x: -237600, y: 246400, gt: "Lat 80.8 / Lon 20.3" },
+                { name: "緑オベリスク (Green)", x: 221600, y: -220000, gt: "Lat 22.5 / Lon 77.7" },
+                { name: "青オベリスク (Blue)", x: -271200, y: -248800, gt: "Lat 18.9 / Lon 16.1" },
+                { name: "ロックウェル端末", x: -106400, y: -58400, gt: "Lat 42.7 / Lon 36.7" }
+            ]
+        },
+        extinction: {
+            name: "Extinction",
+            shiftLat: 50.0,
+            shiftLon: 50.0,
+            multLat: 8000.0,
+            multLon: 8000.0,
+            image: "images/extinction.jpg",
+            landmarks: [
+                { name: "赤オベリスク (Red)", x: 215200, y: 220800, gt: "Lat 77.6 / Lon 76.9" },
+                { name: "緑オベリスク (Green)", x: -162400, y: 4800, gt: "Lat 50.6 / Lon 29.7" },
+                { name: "砂漠タイタン端末", x: 321600, y: 376800, gt: "Lat 97.1 / Lon 90.2" },
+                { name: "キングタイタン端末", x: -6400, y: -372800, gt: "Lat 3.4 / Lon 49.2" }
+            ]
+        }
+    };
+
+    const mapSelect = document.getElementById('mapSelect');
+    const inputRaw = document.getElementById('inputRaw');
+    const inputX = document.getElementById('inputX');
+    const inputY = document.getElementById('inputY');
+    const latResult = document.getElementById('latResult');
+    const lonResult = document.getElementById('lonResult');
+    const mapVisual = document.getElementById('mapVisual');
+    const mapMarker = document.getElementById('mapMarker');
+    const btnCopy = document.getElementById('btnCopy');
+    const toastMessage = document.getElementById('toastMessage');
+
+    // テンキー関連
+    const btnKeypadTriggerX = document.getElementById('btnKeypadTriggerX');
+    const btnKeypadTriggerY = document.getElementById('btnKeypadTriggerY');
+    const virtualKeypad = document.getElementById('virtualKeypad');
+    const keypadCurrentTargetLabel = document.getElementById('keypadCurrentTargetLabel');
+    const btnSwitchTarget = document.getElementById('btnSwitchTarget');
+    const btnCloseKeypad = document.getElementById('btnCloseKeypad');
+    const btnKeyNext = document.getElementById('btnKeyNext');
+
+    // お気に入り関連
+    const favoriteSection = document.getElementById('favoriteSection');
+    const btnToggleFavSection = document.getElementById('btnToggleFavSection');
+    const favToggleArrow = document.getElementById('favToggleArrow');
+    const favBody = document.getElementById('favBody');
+    const favNameInput = document.getElementById('favNameInput');
+    const btnFavToggle = document.getElementById('btnFavToggle');
+    const favBtnIcon = document.getElementById('favBtnIcon');
+    const favBtnText = document.getElementById('favBtnText');
+    const favCountBadge = document.getElementById('favCountBadge');
+    const favList = document.getElementById('favList');
+    const favMapPinsLayer = document.getElementById('favMapPinsLayer');
+
+    // 地図操作トグルスイッチ関連 (デフォルト: OFF)
+    const btnMapTouchToggle = document.getElementById('btnMapTouchToggle');
+    const mapToggleStatusText = document.getElementById('mapToggleStatusText');
+    let isMapTouchEnabled = false;
+
+    function updateMapToggleUI() {
+        if (isMapTouchEnabled) {
+            btnMapTouchToggle.classList.add('active');
+            mapToggleStatusText.innerText = 'ON';
+            mapVisual.classList.add('touch-enabled');
+        } else {
+            btnMapTouchToggle.classList.remove('active');
+            mapToggleStatusText.innerText = 'OFF';
+            mapVisual.classList.remove('touch-enabled');
+            isDragging = false;
+        }
+    }
+
+    btnMapTouchToggle.addEventListener('click', () => {
+        isMapTouchEnabled = !isMapTouchEnabled;
+        updateMapToggleUI();
+        if (isMapTouchEnabled) {
+            showToast('地図タッチ入力をONにしました');
+        } else {
+            showToast('地図を固定しました（スクロール優先）');
+        }
+    });
+
+    let currentLat = null;
+    let currentLon = null;
+    let isDragging = false;
+    let currentTargetInput = inputX;
+
+    const STORAGE_KEY = 'ark_coords_favorites_v1';
+
+    // お気に入りセクションの開閉
+    function openFavSection() {
+        favBody.style.display = 'flex';
+        favToggleArrow.innerText = '▲ 閉じる';
+    }
+
+    btnToggleFavSection.addEventListener('click', () => {
+        const isHidden = favBody.style.display === 'none';
+        favBody.style.display = isHidden ? 'flex' : 'none';
+        favToggleArrow.innerText = isHidden ? '▲ 閉じる' : '▼ 展開';
+    });
+
+    // 入力値のサニタイズ（数字・マイナス・小数点のみ許可）
+    function sanitizeCoordInput(val) {
+        if (!val) return '';
+        val = val.replace(/[^0-9.-]/g, '');
+        // マイナスは先頭のみ許可
+        if (val.indexOf('-') > 0) {
+            val = (val.charAt(0) === '-' ? '-' : '') + val.replace(/-/g, '');
+        }
+        // 小数点は1つまで
+        const parts = val.split('.');
+        if (parts.length > 2) {
+            val = parts[0] + '.' + parts.slice(1).join('');
+        }
+        return val;
+    }
+
+    // 正負の反転処理 (±)
+    function toggleSign(inputElem) {
+        let val = inputElem.value.trim();
+        if (!val) {
+            val = '-';
+        } else if (val.startsWith('-')) {
+            val = val.substring(1);
+        } else {
+            val = '-' + val;
+        }
+        inputElem.value = val;
+        calculateCoordinates();
+        checkFavoriteStatus();
+    }
+
+    // ダブルタップによる拡大（ダブルタップズーム）の抑制
+    let lastTouchTime = 0;
+    document.addEventListener('touchend', (e) => {
+        // テンキー、ボタン、入力欄、セレクトボックスのタップは抑制処理から除外し、高速連続入力を確実に通す
+        if (e.target.closest('.virtual-keypad') || e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) {
+            return;
+        }
+        const currentTime = Date.now();
+        if (currentTime - lastTouchTime <= 300) {
+            e.preventDefault();
+        }
+        lastTouchTime = currentTime;
+    }, { passive: false });
+
+    // 吹き出し矢印（Beak）の位置を対象アイコンに合わせる
+    function updateKeypadPosition() {
+        if (virtualKeypad.style.display === 'none') return;
+        const trigger = (currentTargetInput === inputX) ? btnKeypadTriggerX : btnKeypadTriggerY;
+        if (!trigger) return;
+        const keypadRect = virtualKeypad.getBoundingClientRect();
+        const triggerRect = trigger.getBoundingClientRect();
+        if (keypadRect.width > 0) {
+            const offset = (triggerRect.left + (triggerRect.width / 2)) - keypadRect.left;
+            const clamped = Math.max(18, Math.min(keypadRect.width - 18, offset));
+            virtualKeypad.style.setProperty('--beak-pos', `${clamped}px`);
+        }
+    }
+
+    // 専用テンキーのUI状態更新（入力枠ハイライト & アイコンアクティブ化）
+    function updateKeypadUI() {
+        const isKeypadOpen = virtualKeypad.style.display !== 'none';
+        const wrapperX = inputX.closest('.input-inline-wrap');
+        const wrapperY = inputY.closest('.input-inline-wrap');
+
+        if (isKeypadOpen) {
+            if (currentTargetInput === inputX) {
+                btnKeypadTriggerX.classList.add('active');
+                btnKeypadTriggerY.classList.remove('active');
+                wrapperX && wrapperX.classList.add('keypad-active-field');
+                wrapperY && wrapperY.classList.remove('keypad-active-field');
+                keypadCurrentTargetLabel.innerText = 'X 座標を入力中';
+                btnSwitchTarget.innerText = 'Y 座標へ ➔';
+            } else {
+                btnKeypadTriggerX.classList.remove('active');
+                btnKeypadTriggerY.classList.add('active');
+                wrapperX && wrapperX.classList.remove('keypad-active-field');
+                wrapperY && wrapperY.classList.add('keypad-active-field');
+                keypadCurrentTargetLabel.innerText = 'Y 座標を入力中';
+                btnSwitchTarget.innerText = 'X 座標へ ➔';
+            }
+            updateKeypadPosition();
+        } else {
+            btnKeypadTriggerX.classList.remove('active');
+            btnKeypadTriggerY.classList.remove('active');
+            wrapperX && wrapperX.classList.remove('keypad-active-field');
+            wrapperY && wrapperY.classList.remove('keypad-active-field');
+        }
+    }
+
+    // フォーカス解除ヘルパー（OSキーボードを確実に閉じる）
+    function dismissOSKeyboard() {
+        inputX.blur();
+        inputY.blur();
+        if (document.activeElement && typeof document.activeElement.blur === 'function') {
+            document.activeElement.blur();
+        }
+    }
+
+    // テンキーの表示切り替え（対象欄指定）
+    function toggleKeypadFor(targetInput) {
+        if (virtualKeypad.style.display !== 'none' && currentTargetInput === targetInput) {
+            closeKeypad();
+            return;
+        }
+        currentTargetInput = targetInput;
+        // アニメーションを毎回確実に発火させる
+        virtualKeypad.style.animation = 'none';
+        virtualKeypad.offsetHeight; // reflow
+        virtualKeypad.style.animation = '';
+        virtualKeypad.style.display = 'flex';
+        updateKeypadUI();
+        dismissOSKeyboard();
+    }
+
+    function closeKeypad() {
+        virtualKeypad.style.display = 'none';
+        updateKeypadUI();
+    }
+
+    function switchKeypadTarget() {
+        currentTargetInput = (currentTargetInput === inputX) ? inputY : inputX;
+        updateKeypadUI();
+        dismissOSKeyboard();
+    }
+
+    btnKeypadTriggerX.addEventListener('click', () => toggleKeypadFor(inputX));
+    btnKeypadTriggerY.addEventListener('click', () => toggleKeypadFor(inputY));
+    btnSwitchTarget.addEventListener('click', () => switchKeypadTarget());
+    btnCloseKeypad.addEventListener('click', () => closeKeypad());
+
+    // テンキー外タップで閉じる（オーバーレイ動作）
+    document.addEventListener('pointerdown', (e) => {
+        if (virtualKeypad.style.display !== 'none') {
+            if (!virtualKeypad.contains(e.target) && 
+                !btnKeypadTriggerX.contains(e.target) && 
+                !btnKeypadTriggerY.contains(e.target) &&
+                !inputX.contains(e.target) &&
+                !inputY.contains(e.target)) {
+                closeKeypad();
+            }
+        }
+    });
+
+    window.addEventListener('resize', () => {
+        if (virtualKeypad.style.display !== 'none') {
+            updateKeypadPosition();
+        }
+    });
+
+    // テンキー表示中の入力欄タップ制御
+    function handleInputTarget(input, e) {
+        if (virtualKeypad.style.display !== 'none') {
+            currentTargetInput = input;
+            updateKeypadUI();
+            if (e && e.cancelable) e.preventDefault();
+            setTimeout(dismissOSKeyboard, 10);
+        }
+    }
+
+    inputX.addEventListener('pointerdown', (e) => handleInputTarget(inputX, e));
+    inputY.addEventListener('pointerdown', (e) => handleInputTarget(inputY, e));
+    inputX.addEventListener('focus', (e) => handleInputTarget(inputX, e));
+    inputY.addEventListener('focus', (e) => handleInputTarget(inputY, e));
+
+    // テンキー入力処理 (即座に反映 & 高速連打対応)
+    function handleKeyInput(key) {
+        if (!key || !currentTargetInput) return;
+
+        let val = currentTargetInput.value;
+
+        if (key === 'backspace') {
+            currentTargetInput.value = val.slice(0, -1);
+        } else if (key === 'clear') {
+            currentTargetInput.value = '';
+        } else if (key === 'toggle-sign') {
+            toggleSign(currentTargetInput);
+            return;
+        } else if (key === '-') {
+            if (!val.startsWith('-')) {
+                currentTargetInput.value = '-' + val;
+            }
+        } else if (key === '.') {
+            if (!val.includes('.')) {
+                currentTargetInput.value = (val === '' || val === '-') ? val + '0.' : val + '.';
+            }
+        } else {
+            // 数字 (0-9)
+            currentTargetInput.value = val + key;
+        }
+
+        currentTargetInput.value = sanitizeCoordInput(currentTargetInput.value);
+        calculateCoordinates();
+        checkFavoriteStatus();
+    }
+
+    // テンキーボタン操作 (pointerdown で即時実行し、高速タップの取りこぼしを完全防止)
+    document.querySelectorAll('.key-btn').forEach(btn => {
+        let isPointerTriggered = false;
+
+        btn.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            dismissOSKeyboard();
+            isPointerTriggered = true;
+            const key = btn.getAttribute('data-key');
+            if (key) {
+                handleKeyInput(key);
+            }
+        });
+
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            dismissOSKeyboard();
+            // pointerdown非対応環境やキーボード操作等のフォールバック
+            if (!isPointerTriggered) {
+                const key = btn.getAttribute('data-key');
+                if (key) {
+                    handleKeyInput(key);
+                }
+            }
+            isPointerTriggered = false;
+        });
+    });
+
+    let isNextPointerTriggered = false;
+    btnKeyNext.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        dismissOSKeyboard();
+        isNextPointerTriggered = true;
+        switchKeypadTarget();
+    });
+    btnKeyNext.addEventListener('click', (e) => {
+        e.preventDefault();
+        dismissOSKeyboard();
+        if (!isNextPointerTriggered) {
+            switchKeypadTarget();
+        }
+        isNextPointerTriggered = false;
+    });
+
+    // マップ背景画像の更新
+    function updateMapTheme() {
+        const selectedKey = mapSelect.value;
+        const config = MAP_CONFIGS[selectedKey] || MAP_CONFIGS.the_island;
+
+        // 背景画像の設定
+        mapVisual.style.backgroundImage = `url('${config.image}')`;
+
+        // 現在値の再計算 & お気に入り一覧更新
+        calculateCoordinates();
+        renderFavorites();
+    }
+
+    // マップタッチ/クリックによる逆計算処理
+    function handleMapInteraction(e) {
+        const rect = mapVisual.getBoundingClientRect();
+        const clientX = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : null);
+        const clientY = e.clientY !== undefined ? e.clientY : (e.touches && e.touches[0] ? e.touches[0].clientY : null);
+        
+        if (clientX === null || clientY === null) return;
+
+        const clickX = clientX - rect.left;
+        const clickY = clientY - rect.top;
+
+        // 0〜100%のGPS座標
+        let lon = (clickX / rect.width) * 100;
+        let lat = (clickY / rect.height) * 100;
+
+        lon = Math.max(0, Math.min(100, lon));
+        lat = Math.max(0, Math.min(100, lat));
+
+        // 小数第1位に丸める
+        lon = Math.round(lon * 10) / 10;
+        lat = Math.round(lat * 10) / 10;
+
+        const selectedKey = mapSelect.value;
+        const config = MAP_CONFIGS[selectedKey] || MAP_CONFIGS.the_island;
+
+        // 逆計算: UE_Coord = (GPS - Shift) * Multiplier
+        const xVal = Math.round((lon - config.shiftLon) * config.multLon);
+        const yVal = Math.round((lat - config.shiftLat) * config.multLat);
+
+        // 各フィールドにセット
+        inputX.value = xVal;
+        inputY.value = yVal;
+        inputRaw.value = `X=${xVal} Y=${yVal}`;
+
+        // 結果の表示更新
+        latResult.innerText = lat.toFixed(1);
+        lonResult.innerText = lon.toFixed(1);
+        currentLat = lat;
+        currentLon = lon;
+
+        // マーカー位置の更新
+        mapMarker.style.left = `${lon}%`;
+        mapMarker.style.top = `${lat}%`;
+        mapMarker.style.display = 'block';
+
+        checkFavoriteStatus();
+    }
+
+    // マップへのポインターイベント（タップ・ドラッグ対応）
+    mapVisual.addEventListener('pointerdown', (e) => {
+        // お気に入りピンのタップ時はマップ移動させない
+        if (e.target.closest('.fav-map-pin')) return;
+        // 地図タッチ入力が無効（OFF）の場合は座標逆算を行わない（通常のスクロールを許可）
+        if (!isMapTouchEnabled) return;
+
+        isDragging = true;
+        mapVisual.setPointerCapture(e.pointerId);
+        handleMapInteraction(e);
+    });
+
+    mapVisual.addEventListener('pointermove', (e) => {
+        if (isDragging && isMapTouchEnabled) {
+            handleMapInteraction(e);
+        }
+    });
+
+    mapVisual.addEventListener('pointerup', (e) => {
+        if (isDragging) {
+            isDragging = false;
+            try { mapVisual.releasePointerCapture(e.pointerId); } catch (_) {}
+        }
+    });
+
+    mapVisual.addEventListener('pointercancel', (e) => {
+        isDragging = false;
+        try { mapVisual.releasePointerCapture(e.pointerId); } catch (_) {}
+    });
+
+    // 一括貼り付け文字列から X と Y を自動抽出
+    function parseRawInput(text) {
+        if (!text) return;
+
+        // X=..., Y=... パターン
+        const matchX = text.match(/(?:^|[^a-zA-Z])X\s*[:=]\s*(-?[\d.]+)/i);
+        const matchY = text.match(/(?:^|[^a-zA-Z])Y\s*[:=]\s*(-?[\d.]+)/i);
+
+        if (matchX && matchY) {
+            inputX.value = sanitizeCoordInput(matchX[1]);
+            inputY.value = sanitizeCoordInput(matchY[1]);
+            calculateCoordinates();
+            checkFavoriteStatus();
+            return;
+        }
+
+        // カンマや空白で2つの数値が区切られているパターン
+        const numbers = text.trim().match(/-?[\d.]+/g);
+        if (numbers && numbers.length >= 2) {
+            inputX.value = sanitizeCoordInput(numbers[0]);
+            inputY.value = sanitizeCoordInput(numbers[1]);
+            calculateCoordinates();
+            checkFavoriteStatus();
+        }
+    }
+
+    // 順計算: UE座標 -> GPS緯度・経度
+    function calculateCoordinates() {
+        const xVal = parseFloat(inputX.value);
+        const yVal = parseFloat(inputY.value);
+        
+        // どちらかが未入力の場合はリセット
+        if (isNaN(xVal) || isNaN(yVal)) {
+            latResult.innerText = '--.-';
+            lonResult.innerText = '--.-';
+            mapMarker.style.display = 'none';
+            currentLat = null;
+            currentLon = null;
+            checkFavoriteStatus();
+            return;
+        }
+
+        const selectedKey = mapSelect.value;
+        const config = MAP_CONFIGS[selectedKey] || MAP_CONFIGS.the_island;
+
+        // 公式Wiki変換式: GPS = Shift + (UE_Coord / Multiplier)
+        let lat = config.shiftLat + (yVal / config.multLat);
+        let lon = config.shiftLon + (xVal / config.multLon);
+
+        // 小数点第1位に丸める
+        lat = Math.round(lat * 10) / 10;
+        lon = Math.round(lon * 10) / 10;
+
+        currentLat = lat;
+        currentLon = lon;
+
+        // 0〜100の範囲内にクランプ（マップ表示用）
+        const displayLat = Math.max(0, Math.min(100, lat));
+        const displayLon = Math.max(0, Math.min(100, lon));
+
+        // 緯度・経度の大型数値を個別に表示
+        latResult.innerText = lat.toFixed(1);
+        lonResult.innerText = lon.toFixed(1);
+
+        // マーカーの位置を更新 (%指定: 背景マップと完全一致)
+        mapMarker.style.left = `${displayLon}%`;
+        mapMarker.style.top = `${displayLat}%`;
+        mapMarker.style.display = 'block';
+
+        checkFavoriteStatus();
+    }
+
+    function showToast(msg) {
+        toastMessage.innerText = msg;
+        setTimeout(() => {
+            if (toastMessage.innerText === msg) {
+                toastMessage.innerText = '';
+            }
+        }, 2200);
+    }
+
+    // クリップボードに結果をコピー（PC版用）
+    btnCopy.addEventListener('click', async () => {
+        if (currentLat === null || currentLon === null) {
+            showToast('コピーする座標がありません');
+            return;
+        }
+
+        const textToCopy = `Lat ${currentLat.toFixed(1)} / Lon ${currentLon.toFixed(1)}`;
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(textToCopy);
+            } else {
+                const tempInput = document.createElement('input');
+                tempInput.value = textToCopy;
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                document.execCommand('copy');
+                document.body.removeChild(tempInput);
+            }
+            showToast('クリップボードにコピーしました！');
+        } catch (e) {
+            showToast('コピーに失敗しました');
+        }
+    });
+
+    // -------------------------------------------------------------
+    // お気に入り (Bookmark) 管理機能
+    // -------------------------------------------------------------
+    function getFavorites() {
+        try {
+            const data = localStorage.getItem(STORAGE_KEY);
+            return data ? JSON.parse(data) : [];
+        } catch (_) {
+            return [];
+        }
+    }
+
+    function saveFavorites(list) {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+        } catch (_) {}
+    }
+
+    function escapeHtml(str) {
+        return String(str).replace(/[&<>"']/g, s => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[s]));
+    }
+
+    // 現在の座標とお気に入り登録済みかを照合
+    function findCurrentFavorite() {
+        if (currentLat === null || currentLon === null) return null;
+        const favorites = getFavorites();
+        const currentMap = mapSelect.value;
+        return favorites.find(f => 
+            f.map === currentMap && 
+            Math.abs(f.lat - currentLat) < 0.15 && 
+            Math.abs(f.lon - currentLon) < 0.15
+        );
+    }
+
+    function checkFavoriteStatus() {
+        const existing = findCurrentFavorite();
+        if (existing) {
+            btnFavToggle.classList.add('active');
+            favBtnIcon.innerText = '★';
+            favBtnText.innerText = 'お気に入り解除';
+            if (!favNameInput.value || favNameInput.dataset.autoFilled === 'true') {
+                favNameInput.value = existing.name;
+                favNameInput.dataset.autoFilled = 'true';
+            }
+        } else {
+            btnFavToggle.classList.remove('active');
+            favBtnIcon.innerText = '⭐';
+            favBtnText.innerText = 'お気に入り登録';
+            if (favNameInput.dataset.autoFilled === 'true') {
+                favNameInput.value = '';
+                favNameInput.dataset.autoFilled = 'false';
+            }
+        }
+    }
+
+    function renderFavorites() {
+        const favorites = getFavorites();
+        const currentMap = mapSelect.value;
+        const filtered = favorites.filter(f => f.map === currentMap);
+
+        favCountBadge.innerText = `${filtered.length}件`;
+        favList.innerHTML = '';
+        favMapPinsLayer.innerHTML = '';
+
+        if (filtered.length === 0) {
+            favList.innerHTML = '<div class="fav-empty">このマップに登録されたお気に入りはありません</div>';
+        } else {
+            filtered.forEach(fav => {
+                // リストアイテム
+                const item = document.createElement('div');
+                item.className = 'fav-item';
+                item.innerHTML = `
+                    <div class="fav-item-main">
+                        <div class="fav-item-name">⭐ ${escapeHtml(fav.name)}</div>
+                        <div class="fav-item-coords">Lat ${fav.lat.toFixed(1)} / Lon ${fav.lon.toFixed(1)} (X:${fav.x}, Y:${fav.y})</div>
+                    </div>
+                    <button type="button" class="fav-del-btn" title="削除">🗑️</button>
+                `;
+
+                item.querySelector('.fav-item-main').addEventListener('click', () => {
+                    loadFavorite(fav);
+                });
+
+                item.querySelector('.fav-del-btn').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deleteFavorite(fav.id);
+                });
+
+                favList.appendChild(item);
+
+                // 地図上の星ピン
+                const pin = document.createElement('div');
+                pin.className = 'fav-map-pin';
+                pin.style.left = `${fav.lon}%`;
+                pin.style.top = `${fav.lat}%`;
+                pin.title = `${fav.name} (Lat ${fav.lat.toFixed(1)} / Lon ${fav.lon.toFixed(1)})`;
+                pin.innerText = '⭐';
+                pin.addEventListener('pointerdown', (e) => {
+                    e.stopPropagation();
+                });
+                pin.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    loadFavorite(fav);
+                });
+                favMapPinsLayer.appendChild(pin);
+            });
+        }
+
+        checkFavoriteStatus();
+    }
+
+    function loadFavorite(fav) {
+        if (mapSelect.value !== fav.map) {
+            mapSelect.value = fav.map;
+            updateMapTheme();
+        }
+        inputX.value = fav.x;
+        inputY.value = fav.y;
+        inputRaw.value = `X=${fav.x} Y=${fav.y}`;
+        favNameInput.value = fav.name;
+        favNameInput.dataset.autoFilled = 'true';
+        calculateCoordinates();
+        checkFavoriteStatus();
+        showToast(`「${fav.name}」を読み込みました`);
+    }
+
+    function deleteFavorite(id) {
+        const favorites = getFavorites().filter(f => f.id !== id);
+        saveFavorites(favorites);
+        renderFavorites();
+        showToast('お気に入りを解除しました');
+    }
+
+    btnFavToggle.addEventListener('click', () => {
+        if (currentLat === null || currentLon === null) {
+            showToast('お気に入り登録する座標がありません');
+            return;
+        }
+
+        const existing = findCurrentFavorite();
+        if (existing) {
+            // すでに登録されている場合は解除
+            deleteFavorite(existing.id);
+            return;
+        }
+
+        // 新規登録
+        const mapConfig = MAP_CONFIGS[mapSelect.value] || MAP_CONFIGS.the_island;
+        const name = favNameInput.value.trim() || `${mapConfig.name} (${currentLat.toFixed(1)}, ${currentLon.toFixed(1)})`;
+        const newFav = {
+            id: 'fav_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+            name: name,
+            map: mapSelect.value,
+            x: Math.round(parseFloat(inputX.value)),
+            y: Math.round(parseFloat(inputY.value)),
+            lat: currentLat,
+            lon: currentLon,
+            createdAt: Date.now()
+        };
+
+        const favorites = getFavorites();
+        favorites.unshift(newFav);
+        saveFavorites(favorites);
+        openFavSection();
+        renderFavorites();
+        showToast(`「${name}」をお気に入りに登録しました！`);
+    });
+
+    // イベントリスナーの登録
+    mapSelect.addEventListener('change', updateMapTheme);
+    inputX.addEventListener('input', () => {
+        const cleaned = sanitizeCoordInput(inputX.value);
+        if (cleaned !== inputX.value) inputX.value = cleaned;
+        calculateCoordinates();
+    });
+    inputY.addEventListener('input', () => {
+        const cleaned = sanitizeCoordInput(inputY.value);
+        if (cleaned !== inputY.value) inputY.value = cleaned;
+        calculateCoordinates();
+    });
+
+    inputRaw.addEventListener('input', (e) => {
+        parseRawInput(e.target.value);
+    });
+    inputRaw.addEventListener('paste', () => {
+        setTimeout(() => parseRawInput(inputRaw.value), 10);
+    });
+
+    // 初期化
+    updateMapTheme();
+    updateMapToggleUI();
+</script>
+
+</body>
+</html>
